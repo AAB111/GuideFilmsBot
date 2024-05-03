@@ -3,26 +3,24 @@ from aiogram.fsm.context import FSMContext
 from states.statesFSM import CardState, ReviewState
 from aiogram.filters import Command
 from datetime import datetime
-from api.requests import (get_movies_by_title, add_movie_to_list, patch_movie_from_list, delete_movie_from_list)
-from kbrds.keyboards import cancel_inline, create_card_inline, create_eval_inline, InfoMovie, InfoRating, InfoAction
+from api.requests import (get_movies_by_title, add_movie_to_list, patch_movie_from_list, delete_movie_from_list,
+                          get_credits_by_id)
+from kbrds.keyboards import (create_card_inline, create_eval_inline, InfoMovie, InfoRating,
+                             InfoAction)
 from aiogram import Bot
 
 card_router = Router()
 
 
 @card_router.message(Command('card'))
-async def card_start(message: types.Message, state: FSMContext):
-    send_message = await message.reply("Напишите название фильма", reply_markup=cancel_inline)
+async def start_card(message: types.Message, state: FSMContext):
+    send_message = await message.reply("Напишите название фильма")
     await state.set_state(CardState.inputTitle)
-    await state.update_data(send_message_id=send_message.message_id)
-    await state.update_data(chat_id=message.chat.id)
 
 
 @card_router.message(CardState.inputTitle)
 async def get_card_input_title(message: types.Message, state: FSMContext, bot: Bot):
     try:
-        data = await state.get_data()
-        await bot.edit_message_reply_markup(data['chat_id'], data['send_message_id'], reply_markup=None)
         searched_movies = await get_movies_by_title(message.text)
         if searched_movies is not None:
             if len(searched_movies) > 1:
@@ -32,23 +30,24 @@ async def get_card_input_title(message: types.Message, state: FSMContext, bot: B
                     message_text += movie['title'] + f" ({datetime.strptime(movie['release_date'], '%Y-%m-%d').year})\n"
                 await message.reply(message_text, parse_mode="HTML")
                 await state.set_state(CardState.selectMovie)
-                return
             elif len(searched_movies) == 1:
                 first_element = searched_movies[0]
                 await send_movie_card(message, first_element)
                 await state.clear()
-                return
-        await message.reply("К сожалению, ничего не найдено. Попробуйте ввести название заново")
+            return
+        await message.reply("К сожалению, ничего не найдено. Попробуйте заново.")
+        await state.clear()
     except Exception as e:
         print(e)
-        await message.reply("Произошла непредвиденная ошибка. Попробуйте ввести название заново")
+        await message.reply("Произошла непредвиденная ошибка")
+        await state.clear()
 
 
 @card_router.message(CardState.selectMovie)
 async def get_card_select_movie(message: types.Message, state: FSMContext):
     data = await state.get_data()
     selected_movies = list(filter(lambda movie: message.text.strip().lower() == movie['title'].strip().lower(),
-                           data['searched_movies']))
+                                  data['searched_movies']))
 
     if len(selected_movies) == 1:
         first_element = selected_movies[0]
@@ -78,34 +77,49 @@ async def get_card_input_year(message: types.Message, state: FSMContext):
 
 
 async def send_movie_card(message: types.Message, movie: dict):
-    title = movie['title']
-    overview = movie['overview']
-    release_date = movie['release_date']
-    poster_path = f"https://image.tmdb.org/t/p/w500/{movie['poster_path']}"
-
-    genres = ', '.join(genre['genre']['name'] for genre in movie['genres'])
-    companies = ', '.join(company['company']['name'] for company in movie['companies'])
-
-    card_text = f"<b>{title}</b>\n\n" \
-                f"<i>Release Date:</i> {release_date}\n" \
-                f"<i>Genres:</i> {genres}\n" \
-                f"<i>Companies:</i> {companies}\n\n" \
-                f"{overview}"
-    card_inline = create_card_inline(movie['id'])
     try:
-        await message.reply_photo(photo=poster_path, caption=card_text, parse_mode='HTML', reply_markup=card_inline)
+        title = movie['title']
+        overview = movie['overview']
+        release_date = movie['release_date']
+        poster_path = f"https://image.tmdb.org/t/p/w500/{movie['poster_path']}"
+
+        genres = ', '.join(genre['genre']['name'] for genre in movie['genres'])
+        companies = ', '.join(company['company']['name'] for company in movie['companies'])
+
+        credits = await get_credits_by_id(movie['id'])
+        if credits is not None:
+            directors = [crew_member['person']['name'] for crew_member in credits[0]['crew'] if
+                         crew_member['job'] == 'Режиссер']
+            top_cast = sorted(credits[0]['cast'], key=lambda x: x['person']['popularity'], reverse=True)[:6]
+            actors = [cast_member['person']['name'] for cast_member in top_cast]
+
+            directors_text = ", ".join(directors)
+            actors_text = ", ".join(actors)
+            card_text = f"<b>{title}</b>\n\n" \
+                        f"<i>Дата выхода:</i> {release_date}\n" \
+                        f"<i>Жанры:</i> {genres}\n" \
+                        f"<i>Компании:</i> {companies}\n\n" \
+                        f"<i>Режиссер(ы):</i> {directors_text}\n\n" \
+                        f"<i>В главных ролях:</i> {actors_text}\n\n" \
+                        f"{overview}"
+        else:
+            card_text = f"<b>{title}</b>\n\n" \
+                        f"<i>Дата выхода:</i> {release_date}\n" \
+                        f"<i>Жанры:</i> {genres}\n" \
+                        f"<i>Компании:</i> {companies}\n\n" \
+                        f"{overview}"
+
+        card_inline = create_card_inline(movie['id'])
+        if movie['poster_path'] is not None:
+            await message.reply_photo(photo=poster_path, caption=card_text, parse_mode='HTML', reply_markup=card_inline)
+        else:
+            await message.reply(card_text, parse_mode='HTML', reply_markup=card_inline)
     except Exception as e:
-        await message.reply(card_text, parse_mode='HTML', reply_markup=card_inline)
-
-
-@card_router.callback_query(F.data.contains('cancel'))
-async def cancel_card(call: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await call.message.edit_text("Операция отменена")
+        print(e)
 
 
 @card_router.callback_query(InfoAction.filter())
-async def cancel_card(call: types.CallbackQuery, callback_data: InfoAction, bot: Bot):
+async def back_button_card(call: types.CallbackQuery, callback_data: InfoAction, bot: Bot):
     if callback_data.action == 'back':
         card_inline = create_card_inline(callback_data.movie_id)
         await bot.edit_message_reply_markup(chat_id=call.message.chat.id, message_id=call.message.message_id,
@@ -119,38 +133,15 @@ async def handle_callback_query(callback: types.CallbackQuery, callback_data: In
         await bot.edit_message_reply_markup(chat_id=callback.message.chat.id, message_id=callback.message.message_id,
                                             reply_markup=eval_kb)
     elif callback_data.action == 'be_watching':
-        data_req = {'movie_id': callback_data.movie_id,'user_id': callback.from_user.id}
-        status_post_http = await add_movie_to_list('be_watching', data_req)
-        match status_post_http:
-            case 200:
-                await callback.answer("Фильм добавлен в закладки")
-            case 400:
-                data_req = {'movie_id': callback_data.movie_id,
-                            'user_id': callback.from_user.id}
-                status_delete_http = await delete_movie_from_list('be_watching', data_req)
-                match status_delete_http:
-                    case 200:
-                        await callback.answer("Фильм удален из закладок")
-            case _:
-                await callback.answer("Внутренная ошибка. Попробуйте ещё раз")
+        data_req = {'movie_id': callback_data.movie_id, 'user_id': callback.from_user.id}
+        await handle_movie_list_callback(callback, 'Фильм добавлен в закладки', 'Фильм удален из закладок',
+                                         'be_watching', add_movie_to_list, delete_movie_from_list, data_req)
     elif callback_data.action == 'dislike':
         data_req = {'movie_id': callback_data.movie_id,
                     'user_id': callback.from_user.id}
-        status_post_http = await add_movie_to_list('negative',
-                                                   data_req)
-        match status_post_http:
-            case 200:
-                await callback.answer("Постараюсь рекомендовать меньше похожего")
-            case 400:
-                data_req = {'movie_id': callback_data.movie_id,
-                            'user_id': callback.from_user.id
-                            }
-                status_del = await delete_movie_from_list('negative', data_req)
-                match status_del:
-                    case 200:
-                        await callback.answer('Фильм удален из "не нравится"')
-            case _:
-                await callback.answer("Внутренная ошибка. Попробуйте ещё раз")
+        await handle_movie_list_callback(callback, "Постараюсь рекомендовать меньше похожего",
+                                         'Фильм удален из "не нравится"',
+                                         'negative', add_movie_to_list, delete_movie_from_list, data_req)
     elif callback_data.action == 'review':
         await callback.message.answer("Напишите заголовок отзыва")
         await state.set_state(ReviewState.inputTitle)
@@ -158,11 +149,10 @@ async def handle_callback_query(callback: types.CallbackQuery, callback_data: In
     elif callback_data.action == 'watched':
         data_req = {'movie_id': callback_data.movie_id,
                     'user_id': callback.from_user.id}
-        status_post_http = await add_movie_to_list('watched', data_req)
-        if status_post_http in [200, 400]:
-            await callback.answer("Поделитесь своим мнением об этом фильме. Я буду рад услышать ваш отзыв!")
-        else:
-            print('Внутренная ошибка. Попробуйте ещё раз')
+        await handle_movie_list_callback(callback, "Поделитесь своим мнением об этом фильме. Я буду рад услышать ваш "
+                                                   "отзыв!",
+                                         "Жалко, что вы не посмотрели этот фильм.",
+                                         'watched', add_movie_to_list, delete_movie_from_list, data_req)
 
 
 @card_router.callback_query(InfoRating.filter())
@@ -170,18 +160,24 @@ async def handle_callback_eval(callback: types.CallbackQuery, callback_data: Inf
     data_req = {'user_id': callback.from_user.id,
                 'movie_id': callback_data.movie_id,
                 'rating': callback_data.rating}
-    status_post_http = await add_movie_to_list('evaluated', data_req)
-    match status_post_http:
+    await handle_movie_list_callback(callback, "Спасибо за оценку!", "Спасибо за оценку!",
+                                     "evaluated", add_movie_to_list, patch_movie_from_list, data_req)
+
+
+async def handle_movie_list_callback(callback: types.CallbackQuery, first_answer: str, second_answer: str,
+                                     name_list: str,
+                                     func_first,
+                                     func_second, data_req: dict):
+    status_http = await func_first(name_list, data_req)
+    match status_http:
         case 200:
-            await callback.answer("Спасибо за оценку!")
+            await callback.answer(first_answer)
         case 400:
-            data_req = {'user_id': callback.from_user.id,
-                        'movie_id': callback_data.movie_id,
-                        'rating': callback_data.rating
-                        }
-            status_patch_http = await patch_movie_from_list('evaluated', data_req)
-            match status_patch_http:
+            status_http = await func_second(name_list, data_req)
+            match status_http:
                 case 200:
-                    await callback.answer("Спасибо за оценку!")
+                    await callback.answer(second_answer)
+                case _:
+                    await callback.answer("Что-то пошло не так. Попробуйте позже.")
         case _:
-            await callback.answer("Внутренная ошибка. Попробуйте ещё раз.")
+            await callback.answer("Что-то пошло не так. Попробуйте позже.")

@@ -22,10 +22,6 @@ class TypeReview(CallbackData, prefix='type_review'):
     type_review: str
 
 
-cancel_inline = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text='Отмена ❌', callback_data='cancel')]
-])
-
 builder = InlineKeyboardBuilder()
 builder.button(text='Положительный', callback_data=TypeReview(type_review='Положительный'))
 builder.button(text='Нейтральный', callback_data=TypeReview(type_review='Нейтральный'))

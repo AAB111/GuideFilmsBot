@@ -5,10 +5,12 @@ import sys
 from aiogram.filters import CommandStart
 import asyncio
 import logging
-
+from handlers.pop import pop_router
+from handlers.content import content_router
 from handlers.search import search_router
 from handlers.review import review_router
 from handlers.card import card_router
+from handlers.be_watching import be_watching_router
 from api.requests import request_auth
 
 dp = Dispatcher()
@@ -22,17 +24,27 @@ async def start(message: types.Message):
         "Моя задача - помочь вам найти лучшие фильмы для просмотра и наслаждения.\n"
         "Спросите меня о популярных фильмах или составьте свой фильм.\n"
         "Если у вас есть описание фильма, который вы ищете, просто дайте мне знать, и я найду для вас похожие фильмы!\n"
-        "И помните, я всегда здесь, чтобы помочь вам в выборе фильма для вашего вечера! 🍿"
+        "И помните, я всегда здесь, чтобы помочь вам в выборе фильма для вашего вечера! 🍿\n\n"
         "Доступные команды:\n"
+        "/start - начать работу с ботом\n"
+        "/pop - получить информацию о популярных фильмах\n"
+        "/content - получить фильмы под ваши интересы\n"
         "/card - получить информацию о конкретном фильме\n"
+        "/tabs - закладки ваших фильмов\n"
     )
+    status = await request_auth(message.from_user.id)
+    if status == 500 or status is None:
+        await message.answer('Что-то пошло не так. Попробуйте /start позже.')
+        return
     await message.answer(welcome_text)
-    await request_auth(message.from_user.id)
 
 
 async def main():
     bot = Bot(token=settings.API_TG_BOT_TOKEN)
+    dp.include_router(pop_router)
+    dp.include_router(content_router)
     dp.include_router(review_router)
+    dp.include_router(be_watching_router)
     dp.include_router(card_router)
     dp.include_router(search_router)
     await dp.start_polling(bot)
