@@ -11,7 +11,9 @@ from handlers.search import search_router
 from handlers.review import review_router
 from handlers.card import card_router
 from handlers.be_watching import be_watching_router
+from handlers.transition import transition_router
 from api.requests import request_auth
+from middlewares.middleware import CheckUserMiddleware
 
 dp = Dispatcher()
 
@@ -41,8 +43,17 @@ async def start(message: types.Message):
 
 async def main():
     bot = Bot(token=settings.API_TG_BOT_TOKEN)
+    dp.callback_query.middleware(CheckUserMiddleware())
+    pop_router.message.middleware(CheckUserMiddleware())
+    content_router.message.middleware(CheckUserMiddleware())
+    transition_router.message.middleware(CheckUserMiddleware())
+    review_router.message.middleware(CheckUserMiddleware())
+    be_watching_router.message.middleware(CheckUserMiddleware())
+    card_router.message.middleware(CheckUserMiddleware())
+    search_router.message.middleware(CheckUserMiddleware())
     dp.include_router(pop_router)
     dp.include_router(content_router)
+    dp.include_router(transition_router)
     dp.include_router(review_router)
     dp.include_router(be_watching_router)
     dp.include_router(card_router)

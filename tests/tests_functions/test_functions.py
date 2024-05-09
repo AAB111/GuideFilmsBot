@@ -1,36 +1,33 @@
 from unittest import mock
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 import pytest
 
-from handlers.content import start_content
-from handlers.functions_common import show_group_movies, show_text_movies
+from handlers.functions_common import show_group_movies, show_text_movies, show_group_movies_message
+from kbrds.keyboards import create_transition_inline
+from tests.utils import TEST_USER
 
 
 @pytest.mark.asyncio
-async def test_content_movies_is_none():
-    with mock.patch('handlers.content.get_content_based',
-                    return_value=None) as mock_get_content_based:
-        message = AsyncMock()
-        message.from_user.id = 2
-        await start_content(message)
-        assert mock_get_content_based.call_count == 1
-        assert mock_get_content_based.call_args == mock.call(message.from_user.id, {"page": 1, "n": 100})
-        message.reply.assert_awaited_with("Внутренняя ошибка. Уже исправляем.")
+async def test_show_movies_is_none():
+    message = AsyncMock()
+    test_text = "Test"
+    result = {"status": 404, "data": None}
+    await show_group_movies_message(message, result, test_text)
+    message.reply.assert_awaited_with("К сожалению, ничего не найдено.")
 
 
 @pytest.mark.asyncio
-async def test_content_movies_is_len_0():
-    with mock.patch('handlers.content.get_content_based', return_value=[]) as mock_get_content_based:
-        message = AsyncMock()
-        message.from_user.id = 2
-        await start_content(message)
-        assert mock_get_content_based.call_count == 1
-        assert mock_get_content_based.call_args == mock.call(message.from_user.id, {"page": 1, "n": 100})
-        message.reply.assert_awaited_with('К сожалению, ничего не найдено.')
+async def test_show_movies_is_len_0():
+    message = AsyncMock()
+    test_text = "Test"
+    movies = []
+    result = {"status": 200, "data": movies}
+    await show_group_movies_message(message, result, test_text)
+    message.reply.assert_awaited_with('К сожалению, ничего не найдено.')
 
 
 @pytest.mark.asyncio
-async def test_content_movies_poster_path_none():
+async def test_show_movies_poster_path_none():
     movies = [{
         "id": 447365,
         "title": "Стражи Галактики Том. 3",
@@ -76,21 +73,17 @@ async def test_content_movies_poster_path_none():
             }
         ]
     }]
+    message = AsyncMock()
+    test_text = "Test"
+    result = {"status": 200, "data": movies}
+    await show_group_movies_message(message, result, test_text)
 
-    with mock.patch('handlers.content.get_content_based', return_value=movies) as mock_get_content_based:
-        message = AsyncMock()
-        message.from_user.id = 1080557340
-        await start_content(message)
-
-        assert mock_get_content_based.call_count == 1
-        assert mock_get_content_based.call_args == mock.call(message.from_user.id, {"page": 1, "n": 100})
-        text_reply = await show_text_movies(movies)
-        message.reply.assert_awaited_with(text_reply,
-                                          parse_mode='HTML')
+    kbrds = create_transition_inline(movies)
+    message.reply.assert_awaited_with(text="Что вы хотите посмотреть?", reply_markup=kbrds[-1])
 
 
 @pytest.mark.asyncio
-async def test_content_text():
+async def test_show_text():
     movies = [{
         "id": 447365,
         "title": "Стражи Галактики Том. 3",
@@ -136,22 +129,17 @@ async def test_content_text():
             }
         ]
     }]
-    with mock.patch('handlers.content.get_content_based', return_value=movies) as mock_get_content_based:
-        message = AsyncMock()
-        message.from_user.id = 1080557340
-        await start_content(message)
+    message = AsyncMock()
+    text_text = "Test"
+    result = {"status": 200, "data": movies}
+    await show_group_movies_message(message, result, text_text)
 
-        assert mock_get_content_based.call_count == 1
-        assert mock_get_content_based.call_args == mock.call(message.from_user.id, {"page": 1, "n": 100})
-
-        text_reply = await show_text_movies(movies)
-
-        message.reply.assert_awaited_with(text_reply,
-                                          parse_mode='HTML')
+    kbrds = create_transition_inline(movies)
+    message.reply.assert_awaited_with(text="Что вы хотите посмотреть?", reply_markup=kbrds[-1])
 
 
 @pytest.mark.asyncio
-async def test_content_media_all():
+async def test_show_media_all():
     movies = [
         {
             "id": 447365,
@@ -1122,22 +1110,18 @@ async def test_content_media_all():
             ]
         }
     ]
-    with mock.patch('handlers.content.get_content_based', return_value=movies) as mock_get_content_based:
-        message = AsyncMock()
-        message.from_user.id = 1080557340
-        await start_content(message)
-
-        assert mock_get_content_based.call_count == 1
-        assert mock_get_content_based.call_args == mock.call(message.from_user.id, {"page": 1, "n": 100})
-
-        media = await show_group_movies(movies)
-
-        message.reply.assert_awaited_with(text="Похоже на то, что вам интересно! 😊")
-        message.reply_media_group.assert_awaited_with(media=media[10:])
+    text_text = "Test"
+    message = AsyncMock()
+    result = {"status": 200, "data": movies}
+    await show_group_movies_message(message, result, text_text)
+    media = await show_group_movies(movies)
+    kbrds = create_transition_inline(movies)
+    message.reply.assert_awaited_with(text="Что вы хотите посмотреть?", reply_markup=kbrds[-1])
+    message.reply_media_group.assert_awaited_with(media=media[10:])
 
 
 @pytest.mark.asyncio
-async def test_content_media_and_poster_is_none():
+async def test_search_media_and_poster_is_none():
     movies = [
         {
             "id": 507089,
@@ -1222,17 +1206,17 @@ async def test_content_media_and_poster_is_none():
             ]
         }
     ]
-
-    with mock.patch('handlers.content.get_content_based', return_value=movies) as mock_get_content_based:
+    with patch("handlers.functions_common.show_text_movies") as mock_show_text_movies:
         message = AsyncMock()
-        message.from_user.id = 2
-        await start_content(message)
-        assert mock_get_content_based.call_count == 1
-        assert mock_get_content_based.call_args == mock.call(message.from_user.id, {"page": 1, "n": 100})
+        message.from_user.id = TEST_USER.id
+        result = {"status": 200, "data": movies}
+        await show_group_movies_message(message, result, "test_overview")
 
         media = await show_group_movies(movies)
         message.reply_media_group.assert_awaited_with(media=media)
 
         movies_poster_path_none = list(filter(lambda movie: movie['poster_path'] is None, movies))
-        text_message = await show_text_movies(movies_poster_path_none)
-        message.reply.assert_awaited_with(text_message, parse_mode="HTML")
+        assert mock_show_text_movies.call_count == 1
+        assert mock_show_text_movies.call_args == mock.call(movies_poster_path_none)
+        kbrds = create_transition_inline(movies)
+        message.reply.assert_awaited_with(text="Что вы хотите посмотреть?", reply_markup=kbrds[-1])

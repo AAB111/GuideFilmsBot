@@ -1,15 +1,13 @@
-from datetime import datetime
+from unittest import mock
 from unittest.mock import AsyncMock
 import pytest
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.base import StorageKey
-
-from api.requests import get_movies_by_title
+from kbrds.keyboards import create_transition_inline
 from states.statesFSM import CardState
 from tests.conftest import storage, bot
 from tests.utils import TEST_USER, TEST_USER_CHAT
-from handlers.card import (start_card, get_card_input_title,
-                           get_card_select_movie, get_card_input_year, send_movie_card)
+from handlers.card import (start_card, get_card_input_title, send_movie_card)
 
 
 @pytest.mark.asyncio
@@ -17,7 +15,6 @@ async def test_card_start(storage, bot):
     message = AsyncMock()
     message.from_user.id = TEST_USER.id
     message.chat.id = TEST_USER_CHAT.id
-    state = None
     async for stor in storage:
         state = FSMContext(
             storage=stor,
@@ -47,7 +44,7 @@ async def test_card_start_input_title_find_len_1(storage, bot):
         )
         await state.update_data(chat_id=TEST_USER_CHAT.id,
                                 send_message_id=50)
-        await get_card_input_title(message, state, bot)
+        await get_card_input_title(message, state)
         assert await state.get_state() is None
 
 
@@ -68,7 +65,7 @@ async def test_card_start_input_title_empty(storage, bot):
         )
         await state.set_state(CardState.inputTitle)
         await state.update_data(chat_id=TEST_USER_CHAT.id, send_message_id=50)
-        await get_card_input_title(message, state, bot)
+        await get_card_input_title(message, state)
 
         message.reply.assert_awaited_with('К сожалению, ничего не найдено. Попробуйте заново.')
         assert await state.get_state() is None
@@ -80,25 +77,179 @@ async def test_card_start_input_title_find_len_more_1(storage, bot):
     message.from_user.id = TEST_USER.id
     message.chat.id = TEST_USER_CHAT.id
     message.text = "Терминатор"
-    async for stor in storage:
-        state = FSMContext(
-            storage=stor,
-            key=StorageKey(
-                bot_id=bot.id,
-                user_id=TEST_USER.id,
-                chat_id=TEST_USER_CHAT.id
+    movies = [
+        {
+            "id": 447365,
+            "title": "Стражи Галактики Том. 3",
+            "tagline": "Еще раз с чувством.",
+            "overview": "Питер Квилл, все еще не оправившийся от потери Гаморы, должен сплотить вокруг себя свою команду, чтобы защитить вселенную, а также защитить одного из своих. Миссия, которая, если ее не завершить успешно, вполне может привести к концу Стражей, какими мы их знаем.",
+            "vote_average": 7.974999904632568,
+            "release_date": "2023-05-03",
+            "poster_path": "/r2J02Z2OpNTctfOSN1Ydgii51I3.jpg",
+            "genres": [
+                {
+                    "genre": {
+                        "id": 878,
+                        "name": " Научная фантастика"
+                    }
+                },
+                {
+                    "genre": {
+                        "id": 12,
+                        "name": " Приключение"
+                    }
+                },
+                {
+                    "genre": {
+                        "id": 28,
+                        "name": " Действие"
+                    }
+                }
+            ],
+            "companies": [
+                {
+                    "company": {
+                        "id": 420,
+                        "name": "Marvel Studios"
+                    }
+                },
+                {
+                    "company": {
+                        "id": 176762,
+                        "name": "Kevin Feige Productions"
+                    }
+                }
+            ]
+        },
+        {
+            "id": 496450,
+            "title": "Чудеса: Ледибаг и Кот Нуар, фильм",
+            "tagline": "Судьба мира в их руках.",
+            "overview": "После того, как хранитель волшебных драгоценностей превратил неуклюжую девочку и популярного мальчика в супергероев, они никогда не смогут раскрыть свои личности — даже друг другу.",
+            "vote_average": 7.738999843597412,
+            "release_date": "2023-07-05",
+            "poster_path": "/dQNJ8SdCMn3zWwHzzQD2xrphR1X.jpg",
+            "genres": [
+                {
+                    "genre": {
+                        "id": 16,
+                        "name": " Анимация"
+                    }
+                },
+                {
+                    "genre": {
+                        "id": 14,
+                        "name": " Фантазия"
+                    }
+                },
+                {
+                    "genre": {
+                        "id": 28,
+                        "name": " Действие"
+                    }
+                },
+                {
+                    "genre": {
+                        "id": 10749,
+                        "name": " Романтика"
+                    }
+                },
+                {
+                    "genre": {
+                        "id": 10751,
+                        "name": " Семья"
+                    }
+                }
+            ],
+            "companies": [
+                {
+                    "company": {
+                        "id": 140008,
+                        "name": "The Awakening Production"
+                    }
+                },
+                {
+                    "company": {
+                        "id": 2902,
+                        "name": "SND"
+                    }
+                },
+                {
+                    "company": {
+                        "id": 200503,
+                        "name": "Fantawild"
+                    }
+                },
+                {
+                    "company": {
+                        "id": 82973,
+                        "name": "Zag Animation Studios"
+                    }
+                },
+                {
+                    "company": {
+                        "id": 220039,
+                        "name": "ON Animation Studios"
+                    }
+                }
+            ]
+        },
+        {
+            "id": 507089,
+            "title": "Пять Ночей С Фредди",
+            "tagline": "Сможете ли вы пережить пять ночей?",
+            "overview": "Недавно уволенный и отчаянно нуждающийся в работе, проблемный молодой человек по имени Майк соглашается устроиться на должность ночного охранника в заброшенном тематическом ресторане: пиццерия Фредди Фазбира. Но вскоре он обнаруживает, что во Фредди все не то, чем кажется.",
+            "vote_average": 7.6570000648498535,
+            "release_date": "2023-10-25",
+            "poster_path": "/A4j8S6moJS2zNtRR8oWF08gRnL5.jpg",
+            "genres": [
+                {
+                    "genre": {
+                        "id": 27,
+                        "name": " Ужастик"
+                    }
+                },
+                {
+                    "genre": {
+                        "id": 9648,
+                        "name": " Тайна"
+                    }
+                }
+            ],
+            "companies": [
+                {
+                    "company": {
+                        "id": 3172,
+                        "name": "Blumhouse Productions"
+                    }
+                },
+                {
+                    "company": {
+                        "id": 211144,
+                        "name": "Scott Cawthon Productions"
+                    }
+                }
+            ]
+        }
+    ]
+    with mock.patch('handlers.card.get_movies_by_title', return_value=movies):
+        async for stor in storage:
+            state = FSMContext(
+                storage=stor,
+                key=StorageKey(
+                    bot_id=bot.id,
+                    user_id=TEST_USER.id,
+                    chat_id=TEST_USER_CHAT.id
+                )
             )
-        )
-        await state.set_state(CardState.inputTitle)
-        await state.update_data(chat_id=TEST_USER_CHAT.id, send_message_id=50)
-        await get_card_input_title(message, state, bot)
-        searched_movies = await get_movies_by_title(message.text)
-        message_text = "Я нашёл несколько подходящих фильмов. Введите <b>полное название</b>:\n\n"
-        for movie in searched_movies:
-            message_text += movie['title'] + f" ({datetime.strptime(movie['release_date'], '%Y-%m-%d').year})\n"
-
-        message.reply.assert_awaited_with(message_text, parse_mode="HTML")
-        assert await state.get_state() == CardState.selectMovie
+            await state.set_state(CardState.inputTitle)
+            await state.update_data(chat_id=TEST_USER_CHAT.id, send_message_id=50)
+            await get_card_input_title(message, state)
+            message_text = "Я нашёл несколько подходящих фильмов."
+            kbrds = create_transition_inline(movies)
+            for kbrd in kbrds:
+                await message.reply(message_text, reply_markup=kbrd)
+            message.reply.assert_awaited_with(message_text, reply_markup=kbrds[-1])
 
 
 @pytest.mark.asyncio
@@ -122,135 +273,11 @@ async def test_card_start_input_title_long(storage, bot):
         )
         await state.set_state(CardState.inputTitle)
         await state.update_data(chat_id=TEST_USER_CHAT.id, send_message_id=50)
-        await get_card_input_title(message, state, bot)
+        await get_card_input_title(message, state)
 
         message.reply.assert_awaited_with('К сожалению, ничего не найдено. Попробуйте заново.')
         assert await state.get_state() is None
 
-
-@pytest.mark.asyncio
-async def test_card_select_movie_len_1(storage, bot):
-    message = AsyncMock()
-    message.from_user.id = TEST_USER.id
-    message.chat.id = TEST_USER_CHAT.id
-    message.text = "РобоКоп 2"
-    async for stor in storage:
-        state = FSMContext(
-            storage=stor,
-            key=StorageKey(
-                bot_id=bot.id,
-                user_id=TEST_USER.id,
-                chat_id=TEST_USER_CHAT.id
-            )
-        )
-        title = "РобоКоп"
-        searched_movies = await get_movies_by_title(title)
-        await state.update_data(searched_movies=searched_movies)
-        await get_card_select_movie(message, state)
-        assert await state.get_state() is None
-
-
-@pytest.mark.asyncio
-async def test_card_select_movie_title_no_valid(storage, bot):
-    message = AsyncMock()
-    message.from_user.id = TEST_USER.id
-    message.chat.id = TEST_USER_CHAT.id
-    message.text = "adsfgh"
-    async for stor in storage:
-        state = FSMContext(
-            storage=stor,
-            key=StorageKey(
-                bot_id=bot.id,
-                user_id=TEST_USER.id,
-                chat_id=TEST_USER_CHAT.id
-            )
-        )
-        title = "РобоКоп"
-        searched_movies = await get_movies_by_title(title)
-        await state.update_data(searched_movies=searched_movies)
-
-        await get_card_select_movie(message, state)
-
-        message.reply.assert_awaited_with("Неправильное название. Попробуйте ещё раз")
-
-
-@pytest.mark.asyncio
-async def test_card_select_movie_len_more_1(storage, bot):
-    message = AsyncMock()
-    message.from_user.id = TEST_USER.id
-    message.chat.id = TEST_USER_CHAT.id
-    message.text = "Робокоп"
-    async for stor in storage:
-        state = FSMContext(
-            storage=stor,
-            key=StorageKey(
-                bot_id=bot.id,
-                user_id=TEST_USER.id,
-                chat_id=TEST_USER_CHAT.id
-            )
-        )
-        await state.set_state(CardState.selectMovie)
-        title = "РобоКоп"
-        searched_movies = await get_movies_by_title(title)
-        await state.update_data(searched_movies=searched_movies)
-        await get_card_select_movie(message, state)
-
-        message.reply.assert_awaited_with("Нашёл несколко похожих фильмов. Введите <b>год</b> для уточнения:",
-                                          parse_mode="HTML")
-        assert await state.get_state() == CardState.inputYear
-        assert (await state.get_data())['selecting_movies'] is not None
-
-
-@pytest.mark.asyncio
-async def test_card_input_year_no_valid(storage, bot):
-    message = AsyncMock()
-    message.from_user.id = TEST_USER.id
-    message.chat.id = TEST_USER_CHAT.id
-    message.text = '2000'
-    async for stor in storage:
-        state = FSMContext(
-            storage=stor,
-            key=StorageKey(
-                bot_id=bot.id,
-                user_id=TEST_USER.id,
-                chat_id=TEST_USER_CHAT.id
-            )
-        )
-        await state.set_state(CardState.inputYear)
-        title = "РобоКоп"
-        searched_movies = await get_movies_by_title(title)
-        selected_movies = list(filter(lambda movie: title.strip().lower() == movie['title'].strip().lower(),
-                                      searched_movies))
-        await state.update_data(selecting_movies=selected_movies)
-        await get_card_input_year(message, state)
-
-        message.reply.assert_awaited_with("Что-то пошло не так. Попробуйте ещё раз")
-
-
-@pytest.mark.asyncio
-async def test_card_input_year_valid(storage, bot):
-    message = AsyncMock()
-    message.from_user.id = TEST_USER.id
-    message.chat.id = TEST_USER_CHAT.id
-    message.text = '1987'
-    async for stor in storage:
-        state = FSMContext(
-            storage=stor,
-            key=StorageKey(
-                bot_id=bot.id,
-                user_id=TEST_USER.id,
-                chat_id=TEST_USER_CHAT.id
-            )
-        )
-        await state.set_state(CardState.inputYear)
-        title = "РобоКоп"
-        searched_movies = await get_movies_by_title(title)
-        selected_movies = list(filter(lambda movie: title.strip().lower() == movie['title'].strip().lower(),
-                                      searched_movies))
-        await state.update_data(selecting_movies=selected_movies)
-        await get_card_input_year(message, state)
-
-        assert await state.get_state() is None
 
 @pytest.mark.asyncio
 async def test_send_movie_card_poster_none():
@@ -307,6 +334,7 @@ async def test_send_movie_card_poster_none():
     message.reply_photo.assert_not_awaited()
     message.reply.assert_awaited()
 
+
 @pytest.mark.asyncio
 async def test_send_movie_card_poster_exists():
     movie = {
@@ -358,18 +386,20 @@ async def test_send_movie_card_poster_exists():
     message.from_user.id = TEST_USER.id
     message.chat.id = TEST_USER_CHAT.id
     message.text = '2000'
-    await send_movie_card(message, movie)
+    result = {'status': 200, 'data': movie}
+    await send_movie_card(message, result)
     message.reply.assert_not_awaited()
     message.reply_photo.assert_awaited()
 
 
 @pytest.mark.asyncio
 async def test_send_movie_card_movie_none():
-    movie = None
+    movie = {}
     message = AsyncMock()
     message.from_user.id = TEST_USER.id
     message.chat.id = TEST_USER_CHAT.id
     message.text = '2000'
-    await send_movie_card(message, movie)
-    message.reply.assert_not_awaited()
+    result = {'status': 200, 'data': movie}
+    await send_movie_card(message, result)
+    message.reply.assert_awaited_with('К сожалению, ничего не найдено. Попробуйте заново.')
     message.reply_photo.assert_not_awaited()
