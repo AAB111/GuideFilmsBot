@@ -10,5 +10,5 @@ search_router = Router()
 async def start_search(message: types.Message):
     await message.reply("Ищу ищу 👀")
     overview = message.text
-    movies = await get_search_movies(overview, message.from_user.id)
+    movies = await get_search_movies(overview)
     await show_group_movies_message(message, movies, 'Вот что я нашел!')

@@ -11,6 +11,7 @@ async def get_pop_based(params: dict = None):
                 return {'status': response.status, 'data': await response.json()}
     except Exception as e:
         print(e)
+        return {'status': 500, 'data': None}
 
 
 async def get_content_based(user_id: int, params: dict = None):
@@ -24,6 +25,7 @@ async def get_content_based(user_id: int, params: dict = None):
                 return {'status': response.status, 'data': await response.json()}
     except Exception as e:
         print(e)
+        return {'status': 500, 'data': None}
 
 
 async def request_auth(user_id: int):
@@ -34,17 +36,19 @@ async def request_auth(user_id: int):
                 return response.status
     except Exception as e:
         print(e)
+        return {'status': 500, 'data': None}
 
 
-async def get_search_movies(overview: str, user_id: int):
+async def get_search_movies(overview: str):
     try:
         async with aiohttp.ClientSession() as session:
-            data = {'overview': overview, 'user_id': user_id}
-            params = {'page': 1, 'n':8}
+            data = {'overview': overview}
+            params = {'page': 1, 'n': 8}
             async with session.post("http://localhost:8000/search_movie", json=data, params=params) as response:
                 return {'status': response.status, 'data': await response.json()}
     except Exception as e:
         print(e)
+        return {'status': 500, 'data': None}
 
 
 async def get_movies_by_title(title: str):
@@ -54,6 +58,7 @@ async def get_movies_by_title(title: str):
                 return {'status': response.status, 'data': await response.json()}
     except Exception as e:
         print(e)
+        return {'status': 500, 'data': None}
 
 
 async def delete_movie_from_list(list_name: str, data: dict):
@@ -63,6 +68,7 @@ async def delete_movie_from_list(list_name: str, data: dict):
                 return response.status
     except Exception as e:
         print(e)
+        return {'status': 500, 'data': None}
 
 
 async def get_movie_from_list(list_name: str, params: dict):
@@ -72,6 +78,7 @@ async def get_movie_from_list(list_name: str, params: dict):
                 return {'status': response.status, 'data': await response.json()}
     except Exception as e:
         print(e)
+        return {'status': 500, 'data': None}
 
 
 async def add_movie_to_list(list_name: str, data: dict):
@@ -81,6 +88,7 @@ async def add_movie_to_list(list_name: str, data: dict):
                 return response.status
     except Exception as e:
         print(e)
+        return {'status': 500, 'data': None}
 
 
 async def patch_movie_from_list(list_name: str, data: dict):
@@ -90,6 +98,7 @@ async def patch_movie_from_list(list_name: str, data: dict):
                 return response.status
     except Exception as e:
         print(e)
+        return {'status': 500, 'data': None}
 
 
 async def get_credits_by_id(movie_id: int):
@@ -99,6 +108,7 @@ async def get_credits_by_id(movie_id: int):
                 return {'status': response.status, 'data': await response.json()}
     except Exception as e:
         print(e)
+        return {'status': 500, 'data': None}
 
 
 async def get_movie_by_id(movie_id: int):
@@ -108,6 +118,7 @@ async def get_movie_by_id(movie_id: int):
                 return {'status': response.status, 'data': await response.json()}
     except Exception as e:
         print(e)
+        return {'status': 500, 'data': None}
 
 
 async def get_similar_movies(movie_id: int):
@@ -118,6 +129,7 @@ async def get_similar_movies(movie_id: int):
                 return {'status': response.status, 'data': await response.json()}
     except Exception as e:
         print(e)
+        return {'status': 500, 'data': None}
 
 
 async def check_user(user_id: int):
@@ -128,3 +140,4 @@ async def check_user(user_id: int):
                 return response.status
     except Exception as e:
         print(e)
+        return {'status': 500, 'data': None}

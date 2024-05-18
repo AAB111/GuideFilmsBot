@@ -8,7 +8,7 @@ MAX_TEXT_LENGTH = 1000
 
 
 async def show_group_movies_message(message: types.Message, result, message_test):
-    if result['status'] == 200:
+    if result['status'] == 200 and result['data'] is not None:
         movies = result['data']
         if len(movies) > 0:
             media = await show_group_movies(movies)
@@ -86,7 +86,7 @@ async def send_movie_card(message: types.Message, result: dict):
         if result['status'] == 200 and result['data'] is not None:
             credits = result['data']
             directors = [crew_member['person']['name'].strip() for crew_member in credits[0]['crew'] if
-                         crew_member['job'] == 'Директор']
+                         crew_member['job'].strip() == 'Директор']
             top_cast = sorted(credits[0]['cast'], key=lambda x: x['person']['popularity'], reverse=True)[:6]
             actors = [cast_member['person']['name'].strip() for cast_member in top_cast]
 
