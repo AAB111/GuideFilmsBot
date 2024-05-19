@@ -42,9 +42,8 @@ async def request_auth(user_id: int):
 async def get_search_movies(overview: str):
     try:
         async with aiohttp.ClientSession() as session:
-            data = {'overview': overview}
-            params = {'page': 1, 'n': 8}
-            async with session.post("http://localhost:8000/search_movie", json=data, params=params) as response:
+            params = {'overview': overview, 'page': 1, 'n': 8}
+            async with session.get("http://localhost:8000/search_movie", params=params) as response:
                 return {'status': response.status, 'data': await response.json()}
     except Exception as e:
         print(e)
@@ -124,8 +123,8 @@ async def get_movie_by_id(movie_id: int):
 async def get_similar_movies(movie_id: int):
     try:
         async with aiohttp.ClientSession() as session:
-            data_req = {'movie_id': movie_id}
-            async with session.post(f"http://localhost:8000/content_based/", json=data_req) as response:
+            data_req = {'movie_id': movie_id, 'page': 1, 'n': 8}
+            async with session.get(f"http://localhost:8000/content_based/movie", params=data_req) as response:
                 return {'status': response.status, 'data': await response.json()}
     except Exception as e:
         print(e)
@@ -136,7 +135,7 @@ async def check_user(user_id: int):
     try:
         async with aiohttp.ClientSession() as session:
             data_req = {'user_id': user_id}
-            async with session.post(f"http://localhost:8000/user/check", json=data_req) as response:
+            async with session.get(f"http://localhost:8000/user/check", params=data_req) as response:
                 return response.status
     except Exception as e:
         print(e)
